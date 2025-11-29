@@ -20,11 +20,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           ############
-      - name: Install Sonar Scanner
-        run: |
-          curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.9.3.5689-linux.zip
-          unzip -qq sonar-scanner.zip
-          export PATH=$PWD/sonar-scanner-4.9.3.5689-linux/bin:$PATH
+      - name: Setup SonarScanner
+        uses: sonarsource/sonar-scanner-action@v*/setup-node  # latest version from Marketplace
+        with:
+          version: '7.3.0.5189'   # or the latest available
+
 
       # 3️⃣ Clean & Package + SonarQube Scan
       - name: Sonar Scan
