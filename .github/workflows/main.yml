@@ -76,6 +76,7 @@ jobs:
 
 
 
+
       # 8️⃣ Run New Application
       - name: Run Application on EC2
         uses: appleboy/ssh-action@v1.1.0
