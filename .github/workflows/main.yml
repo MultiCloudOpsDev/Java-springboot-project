@@ -1,8 +1,6 @@
 name: Full CI/CD Pipeline
 
 on:
-  #push:
-   # branches: [ "main" ]
   workflow_dispatch:   # ✅ Manual trigger only
 
 jobs:
@@ -33,16 +31,6 @@ jobs:
         -Dsonar.host.url=${{ secrets.SONAR_URL }} \
         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-    # 4️⃣ QUALITY GATE
-    # - name: SonarQube Quality Gate
-    #   uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
-    #   timeout-minutes: 5
-    #   with:
-    #     scanMetadataReportFile: target/site/sonar/report-task.txt
-    #   env:
-    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    #     SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
-
     # 5️⃣ Build Backend JAR
     - name: Build Backend
       run: mvn clean package -DskipTests=true
@@ -57,8 +45,8 @@ jobs:
         source: "target/datastore-0.0.7.jar"
         target: "/home/ec2-user/app/"
 
-    # 7️⃣ Stop Old Backend (FORCED SAFE - NEVER FAILS PIPELINE)
-    - name: Stop Old Backend (Forced Safe)
+    # 7️⃣ Stop Old Backend (SAFE)
+    - name: Stop Old Backend
       continue-on-error: true
       uses: appleboy/ssh-action@v1.1.0
       with:
@@ -66,15 +54,8 @@ jobs:
         username: ec2-user
         key: ${{ secrets.EC2_KEY }}
         script: |
-          echo "Stopping old backend safely..."
-
           sudo pkill -f datastore-0.0.7.jar || true
-
           sleep 2
-
-          echo "Backend stop step completed ✅"
-
-
 
     # 8️⃣ Start New Backend
     - name: Run Backend
@@ -109,7 +90,7 @@ jobs:
         source: "frontend/"
         target: "/home/ec2-user/frontend/"
 
-    # 🔟 Deploy Frontend (NO PYTHON INSTALL)
+    # 🔟 Deploy Frontend (✅ FIXED PATHS)
     - name: Deploy Frontend
       uses: appleboy/ssh-action@v1.1.0
       with:
@@ -117,14 +98,14 @@ jobs:
         username: ec2-user
         key: ${{ secrets.EC2_KEY }}
         script: |
-          cd /home/ec2-user/frontend
+          cd /home/ec2-user/frontend/frontend
 
-          if [ ! -d "venv" ]; then
-            python3 -m venv venv
+          if [ ! -d "../venv" ]; then
+            python3 -m venv ../venv
           fi
 
-          ./venv/bin/pip install --upgrade pip
-          ./venv/bin/pip install streamlit requests
+          ../venv/bin/pip install --upgrade pip
+          ../venv/bin/pip install streamlit requests
 
           sudo tee /etc/systemd/system/frontend.service > /dev/null <<EOF
           [Unit]
@@ -133,7 +114,7 @@ jobs:
 
           [Service]
           User=ec2-user
-          WorkingDirectory=/home/ec2-user/frontend
+          WorkingDirectory=/home/ec2-user/frontend/frontend
           ExecStart=/home/ec2-user/frontend/venv/bin/python -m streamlit run app.py --server.port=8501 --server.address=0.0.0.0
           Environment=API_URL=http://${{ secrets.EC2_HOST }}:8084
           Restart=always
