@@ -58,17 +58,21 @@ jobs:
         target: "/home/ec2-user/app/"
 
     # 7️⃣ Stop Old Backend
-    - name: Stop Old Backend
+    - name: Stop Old Backend (Safe)
       uses: appleboy/ssh-action@v1.1.0
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ec2-user
         key: ${{ secrets.EC2_KEY }}
         script: |
-          PID=$(pgrep -f datastore-0.0.7.jar || true)
-          if [ -n "$PID" ]; then
-            sudo kill -9 $PID
-          fi
+           echo "Stopping old backend safely..."
+
+            sudo pkill -f datastore-0.0.7.jar || echo "No old process found"
+
+              sleep 2
+
+           echo "Backend stop step completed ✅"
+
 
     # 8️⃣ Start New Backend
     - name: Run Backend
