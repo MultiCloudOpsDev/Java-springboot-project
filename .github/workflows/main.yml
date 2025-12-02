@@ -1,4 +1,4 @@
-name: Full CI/CD Pipeline 
+name: Full CI/CD Pipeline
 
 on:
   #push:
@@ -15,14 +15,12 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-
     # 2️⃣ Setup Java 17
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-
 
     # 3️⃣ SonarQube Scan
     - name: Sonar Scan
@@ -35,8 +33,7 @@ jobs:
         -Dsonar.host.url=${{ secrets.SONAR_URL }} \
         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
-
-    # 4️⃣ ✅ QUALITY GATE CHECK (FIXED)
+    # 4️⃣ QUALITY GATE
     - name: SonarQube Quality Gate
       uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
       timeout-minutes: 5
@@ -46,11 +43,9 @@ jobs:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
 
-
     # 5️⃣ Build Backend JAR
     - name: Build Backend
       run: mvn clean package -DskipTests=true
-
 
     # 6️⃣ Upload Backend JAR to EC2
     - name: Upload JAR
@@ -61,7 +56,6 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         source: "target/datastore-0.0.7.jar"
         target: "/home/ec2-user/app/"
-
 
     # 7️⃣ Stop Old Backend
     - name: Stop Old Backend
@@ -75,7 +69,6 @@ jobs:
           if [ -n "$PID" ]; then
             sudo kill -9 $PID
           fi
-
 
     # 8️⃣ Start New Backend
     - name: Run Backend
@@ -98,54 +91,51 @@ jobs:
            --LOG_FILE_PATH="/var/log/app/datastore.log" \
            --server.port=8084 > /var/log/app/nohup.out 2>&1 &
 
+    # ================= FRONTEND DEPLOY =================
 
-# ================= FRONTEND DEPLOY =================
+    # 9️⃣ Upload Frontend Code
+    - name: Upload Frontend
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_KEY }}
+        source: "frontend/"
+        target: "/home/ec2-user/frontend/"
 
-# Upload Frontend Code
-- name: Upload Frontend
-  uses: appleboy/scp-action@v0.1.7
-  with:
-    host: ${{ secrets.EC2_HOST }}
-    username: ec2-user
-    key: ${{ secrets.EC2_KEY }}
-    source: "frontend/"
-    target: "/home/ec2-user/frontend/"
+    # 🔟 Deploy Frontend (NO PYTHON INSTALL)
+    - name: Deploy Frontend
+      uses: appleboy/ssh-action@v1.1.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          cd /home/ec2-user/frontend
 
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
 
-# Setup & Restart Frontend (NO PYTHON INSTALL)
-- name: Deploy Frontend
-  uses: appleboy/ssh-action@v1.1.0
-  with:
-    host: ${{ secrets.EC2_HOST }}
-    username: ec2-user
-    key: ${{ secrets.EC2_KEY }}
-    script: |
-      cd /home/ec2-user/frontend
+          ./venv/bin/pip install --upgrade pip
+          ./venv/bin/pip install streamlit requests
 
-      if [ ! -d "venv" ]; then
-        python3 -m venv venv
-      fi
+          sudo tee /etc/systemd/system/frontend.service > /dev/null <<EOF
+          [Unit]
+          Description=Streamlit Frontend
+          After=network.target
 
-      ./venv/bin/pip install --upgrade pip
-      ./venv/bin/pip install streamlit requests
+          [Service]
+          User=ec2-user
+          WorkingDirectory=/home/ec2-user/frontend
+          ExecStart=/home/ec2-user/frontend/venv/bin/python -m streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+          Environment=API_URL=http://${{ secrets.EC2_HOST }}:8084
+          Restart=always
 
-      sudo tee /etc/systemd/system/frontend.service > /dev/null <<EOF
-      [Unit]
-      Description=Streamlit Frontend
-      After=network.target
+          [Install]
+          WantedBy=multi-user.target
+          EOF
 
-      [Service]
-      User=ec2-user
-      WorkingDirectory=/home/ec2-user/frontend
-      ExecStart=/home/ec2-user/frontend/venv/bin/python -m streamlit run app.py --server.port=8501 --server.address=0.0.0.0
-      Environment=API_URL=http://${{ secrets.EC2_HOST }}:8084
-      Restart=always
-
-      [Install]
-      WantedBy=multi-user.target
-      EOF
-
-      sudo systemctl daemon-reload
-      sudo systemctl enable frontend
-      sudo systemctl restart frontend
-
+          sudo systemctl daemon-reload
+          sudo systemctl enable frontend
+          sudo systemctl restart frontend
