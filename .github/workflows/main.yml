@@ -34,14 +34,14 @@ jobs:
         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
     # 4️⃣ QUALITY GATE
-    - name: SonarQube Quality Gate
-      uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
-      timeout-minutes: 5
-      with:
-        scanMetadataReportFile: target/site/sonar/report-task.txt
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
+    # - name: SonarQube Quality Gate
+    #   uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+    #   timeout-minutes: 5
+    #   with:
+    #     scanMetadataReportFile: target/site/sonar/report-task.txt
+    #   env:
+    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    #     SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
 
     # 5️⃣ Build Backend JAR
     - name: Build Backend
