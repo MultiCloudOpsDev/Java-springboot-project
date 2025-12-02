@@ -57,8 +57,9 @@ jobs:
         source: "target/datastore-0.0.7.jar"
         target: "/home/ec2-user/app/"
 
-        # 7️⃣ Stop Old Backend (Safe)
-    - name: Stop Old Backend (Safe)
+    # 7️⃣ Stop Old Backend (FORCED SAFE - NEVER FAILS PIPELINE)
+    - name: Stop Old Backend (Forced Safe)
+      continue-on-error: true
       uses: appleboy/ssh-action@v1.1.0
       with:
         host: ${{ secrets.EC2_HOST }}
@@ -67,7 +68,7 @@ jobs:
         script: |
           echo "Stopping old backend safely..."
 
-          sudo pkill -f datastore-0.0.7.jar || echo "No old process found"
+          sudo pkill -f datastore-0.0.7.jar || true
 
           sleep 2
 
